@@ -1,0 +1,54 @@
+name: burger_king_kiosk
+description: Burger King Kiosk Prototype
+
+publish_to: "none"
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/logo/
+    - assets/backgrounds/
+
+    - assets/products/
+    - assets/ui/
+    - assets/addons/
+
+    - assets/products/all_day_breakfast/
+    - assets/products/bk_cafe/
+    - assets/products/chicken_king/
+    - assets/products/chicken_rice_meals/
+    - assets/products/dessert/
+    - assets/products/drinks/
+    - assets/products/featured/
+    - assets/products/flame_grilled_cheeseburger/
+    - assets/products/group_meals/
+    - assets/products/king_savers_bundles/
+    - assets/products/king_specials/
+    - assets/products/plant_based_whopper/
+    - assets/products/ultimate_sidekings/
+    - assets/products/whopper/
+    - assets/products/xtra_long_chicken/
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo/app_icon.png"
