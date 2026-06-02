@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/mock_products.dart';
+import '../services/api_service.dart';
 import '../services/cart_service.dart';
 import '../widgets/bk_app_bar.dart';
 import 'cart_screen.dart';
@@ -18,11 +19,13 @@ class CategoryScreen extends StatefulWidget {
 }
 
 class _CategoryScreenState extends State<CategoryScreen> {
-  late String selectedCategory;
+  String selectedCategory = '';
+  bool isLoading = true;
+  String? errorMessage;
+  List<Product> products = [];
 
   List<String> get categories {
-    final allCategories =
-        mockProducts.map((product) => product.category).toSet().toList();
+    final allCategories = products.map((product) => product.category).toSet().toList();
 
     allCategories.sort((a, b) {
       if (a == 'Featured') return -1;
@@ -34,7 +37,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
   }
 
   List<Product> get selectedProducts {
-    return mockProducts
+    return products
         .where((product) => product.category == selectedCategory)
         .toList();
   }
@@ -42,8 +45,84 @@ class _CategoryScreenState extends State<CategoryScreen> {
   @override
   void initState() {
     super.initState();
-    selectedCategory =
-        categories.contains('Featured') ? 'Featured' : categories.first;
+    loadMenuItems();
+  }
+
+  Future<void> loadMenuItems() async {
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
+
+    try {
+      final menuItems = await ApiService.getMenuItems();
+      final loadedProducts = menuItems.map(_productFromApi).toList();
+      final loadedCategories = loadedProducts.map((product) => product.category).toSet().toList();
+
+      loadedCategories.sort((a, b) {
+        if (a == 'Featured') return -1;
+        if (b == 'Featured') return 1;
+        return a.compareTo(b);
+      });
+
+      if (!mounted) return;
+
+      setState(() {
+        products = loadedProducts;
+        selectedCategory = loadedCategories.contains('Featured')
+            ? 'Featured'
+            : loadedCategories.isNotEmpty
+                ? loadedCategories.first
+                : '';
+        isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        errorMessage = error.toString();
+        isLoading = false;
+      });
+    }
+  }
+
+  Product _productFromApi(Map<String, dynamic> item) {
+    final name = item['name']?.toString() ?? 'Menu Item';
+    final category = item['category']?.toString() ?? 'Menu';
+    final id = int.tryParse(item['id']?.toString() ?? '') ?? name.hashCode.abs();
+    final price = _parsePrice(item['price']);
+
+    return Product(
+      id: id,
+      category: category,
+      name: name,
+      price: price,
+      image: _fallbackImage(name, category),
+    );
+  }
+
+  double _parsePrice(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  String _fallbackImage(String name, String category) {
+    final text = '${name.toLowerCase()} ${category.toLowerCase()}';
+
+    if (text.contains('whopper')) return 'assets/products/whopper/whopper.webp';
+    if (text.contains('cheese')) {
+      return 'assets/products/flame_grilled_cheeseburger/flamed_grilled_cheese_burger.webp';
+    }
+    if (text.contains('chicken')) return 'assets/products/chicken_king/chicken_king.webp';
+    if (text.contains('fries')) return 'assets/products/ultimate_sidekings/thick_cut_fries.webp';
+    if (text.contains('nugget')) return 'assets/products/ultimate_sidekings/6pc_chicken_nuggets.webp';
+    if (text.contains('coke')) return 'assets/products/drinks/coke_original_taste.webp';
+    if (text.contains('drink')) return 'assets/products/drinks/coke_original_taste.webp';
+    if (text.contains('dessert') || text.contains('sundae')) {
+      return 'assets/products/dessert/chocolate_sundae.webp';
+    }
+
+    return 'assets/products/placeholder.webp';
   }
 
   void openCart() async {
@@ -58,11 +137,10 @@ class _CategoryScreenState extends State<CategoryScreen> {
   }
 
   String getCategoryImage(String category) {
-    final products =
-        mockProducts.where((product) => product.category == category).toList();
+    final categoryProducts = products.where((product) => product.category == category).toList();
 
-    if (products.isNotEmpty) {
-      return products.first.image;
+    if (categoryProducts.isNotEmpty) {
+      return categoryProducts.first.image;
     }
 
     return 'assets/products/placeholder.webp';
@@ -74,7 +152,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
     if (lower.contains('featured')) {
       return 'Popular picks and limited-time favorites.';
     }
-    if (lower.contains('whopper')) {
+    if (lower.contains('burger') || lower.contains('whopper')) {
       return 'Flame-grilled burger with classic BK flavor.';
     }
     if (lower.contains('chicken')) {
@@ -92,13 +170,13 @@ class _CategoryScreenState extends State<CategoryScreen> {
     if (lower.contains('cafe')) {
       return 'Coffee, matcha, mocha, and affogato drinks.';
     }
-    if (lower.contains('drinks')) {
+    if (lower.contains('drink')) {
       return 'Cold drinks and refreshing beverages.';
     }
     if (lower.contains('dessert')) {
       return 'Sweet treats to complete your meal.';
     }
-    if (lower.contains('group')) {
+    if (lower.contains('group') || lower.contains('meal')) {
       return 'Meal bundles good for sharing.';
     }
 
@@ -116,16 +194,36 @@ class _CategoryScreenState extends State<CategoryScreen> {
         cartCount: CartService.itemCount,
         onCartPressed: openCart,
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: isTabletLayout
-                ? _buildTabletLayout()
-                : _buildLaptopLayout(width),
-          ),
-          if (CartService.itemCount > 0) _buildViewOrderBar(),
-        ],
-      ),
+      body: _buildBody(isTabletLayout, width),
+    );
+  }
+
+  Widget _buildBody(bool isTabletLayout, double width) {
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (errorMessage != null) {
+      return _ErrorState(
+        message: errorMessage!,
+        onRetry: loadMenuItems,
+      );
+    }
+
+    if (products.isEmpty || categories.isEmpty) {
+      return _ErrorState(
+        message: 'No menu items found from backend.',
+        onRetry: loadMenuItems,
+      );
+    }
+
+    return Column(
+      children: [
+        Expanded(
+          child: isTabletLayout ? _buildTabletLayout() : _buildLaptopLayout(width),
+        ),
+        if (CartService.itemCount > 0) _buildViewOrderBar(),
+      ],
     );
   }
 
@@ -387,6 +485,54 @@ class _CategoryScreenState extends State<CategoryScreen> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _ErrorState({
+    required this.message,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.wifi_off,
+              size: 52,
+              color: Color(0xFFD62300),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 16,
+                color: Color(0xFF4A1600),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: onRetry,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD62300),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('RETRY'),
+            ),
+          ],
         ),
       ),
     );

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/cart_service.dart';
 import '../widgets/bk_app_bar.dart';
-import 'success_screen.dart';
+import 'payment_processing_screen.dart';
 
 class PaymentScreen extends StatefulWidget {
   final String orderType;
@@ -41,6 +41,25 @@ class _PaymentScreenState extends State<PaymentScreen> {
     },
   ];
 
+  void placeOrder() {
+    if (CartService.items.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Your cart is empty.')),
+      );
+      return;
+    }
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PaymentProcessingScreen(
+          orderType: widget.orderType,
+          paymentMethod: selectedPayment,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -77,7 +96,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           ),
                         ),
                         const SizedBox(height: 20),
-
                         Expanded(
                           child: GridView.builder(
                             itemCount: paymentMethods.length,
@@ -156,9 +174,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     ),
                   ),
                 ),
-
                 const SizedBox(width: 24),
-
                 Expanded(
                   flex: 4,
                   child: Container(
@@ -179,7 +195,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           ),
                         ),
                         const SizedBox(height: 18),
-
                         Text(
                           'Order Type: ${widget.orderType}',
                           style: const TextStyle(
@@ -187,14 +202,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
                             color: Colors.black54,
                           ),
                         ),
-
                         const SizedBox(height: 20),
                         const Divider(),
-
                         _SummaryRow(
                           label: 'Subtotal',
-                          value:
-                              '₱${CartService.subtotal.toStringAsFixed(0)}',
+                          value: '₱${CartService.subtotal.toStringAsFixed(0)}',
                         ),
                         const SizedBox(height: 10),
                         _SummaryRow(
@@ -207,9 +219,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           value: '₱${CartService.total.toStringAsFixed(0)}',
                           isTotal: true,
                         ),
-
                         const Spacer(),
-
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(16),
@@ -227,24 +237,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
                             ),
                           ),
                         ),
-
                         const SizedBox(height: 18),
-
                         SizedBox(
                           width: double.infinity,
                           height: 70,
                           child: ElevatedButton(
-                            onPressed: () {
-                              Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => SuccessScreen(
-                                    orderType: widget.orderType,
-                                    paymentMethod: selectedPayment,
-                                  ),
-                                ),
-                              );
-                            },
+                            onPressed: placeOrder,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFFD62300),
                               foregroundColor: Colors.white,

@@ -1,5 +1,6 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
+import '../services/cart_service.dart';
 import '../widgets/bk_app_bar.dart';
 import 'success_screen.dart';
 
@@ -19,11 +20,70 @@ class PaymentProcessingScreen extends StatefulWidget {
 }
 
 class _PaymentProcessingScreenState extends State<PaymentProcessingScreen> {
+  bool isSubmitting = true;
+  String? errorMessage;
+
   @override
   void initState() {
     super.initState();
+    Future.microtask(submitOrderAndPayment);
+  }
 
-    Timer(const Duration(seconds: 3), () {
+  String get backendOrderType {
+    final value = widget.orderType.toLowerCase();
+    if (value.contains('take')) return 'take_out';
+    return 'dine_in';
+  }
+
+  String get backendPaymentMethod {
+    final value = widget.paymentMethod.toLowerCase();
+
+    if (value.contains('gcash')) return 'gcash';
+    if (value.contains('maya')) return 'maya';
+    if (value.contains('card') || value.contains('credit')) return 'card';
+
+    return 'cash';
+  }
+
+  Future<void> submitOrderAndPayment() async {
+    setState(() {
+      isSubmitting = true;
+      errorMessage = null;
+    });
+
+    try {
+      if (CartService.items.isEmpty) {
+        throw ApiException('Cannot place order because cart is empty.');
+      }
+
+      final totalAmount = CartService.total;
+
+      final orderPayload = {
+        'order_type': backendOrderType,
+        'items': CartService.items.map((item) {
+          return {
+            'product_id': item.product.id,
+            'product_name': item.product.name,
+            'quantity': item.quantity,
+            'price': item.unitPrice,
+          };
+        }).toList(),
+      };
+
+      final createdOrder = await ApiService.createOrder(orderPayload);
+
+      if (createdOrder.id == null) {
+        throw ApiException('Order was created, but order ID was not returned.');
+      }
+
+      final paymentPayload = {
+        'order_id': createdOrder.id,
+        'payment_method': backendPaymentMethod,
+        'amount': totalAmount,
+      };
+
+      await ApiService.createPayment(paymentPayload);
+
       if (!mounted) return;
 
       Navigator.pushReplacement(
@@ -32,10 +92,19 @@ class _PaymentProcessingScreenState extends State<PaymentProcessingScreen> {
           builder: (_) => SuccessScreen(
             orderType: widget.orderType,
             paymentMethod: widget.paymentMethod,
+            orderId: createdOrder.id,
+            queueNumber: createdOrder.queueNumber,
           ),
         ),
       );
-    });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        isSubmitting = false;
+        errorMessage = error.toString();
+      });
+    }
   }
 
   @override
@@ -65,30 +134,26 @@ class _PaymentProcessingScreenState extends State<PaymentProcessingScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'PROCESSING PAYMENT',
-                style: TextStyle(
+              Text(
+                errorMessage == null ? 'PROCESSING PAYMENT' : 'ORDER FAILED',
+                style: const TextStyle(
                   fontSize: 34,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF4A1600),
                 ),
               ),
-
               const SizedBox(height: 15),
-
               Text(
-                widget.paymentMethod == 'Cash'
-                    ? 'Please pay at the counter.'
-                    : 'Please tap, insert, or scan your payment.',
+                errorMessage == null
+                    ? 'Sending your order and payment to the kitchen system.'
+                    : errorMessage!,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 20,
                   color: Colors.black54,
                 ),
               ),
-
               const SizedBox(height: 35),
-
               Container(
                 width: 260,
                 height: 190,
@@ -100,9 +165,7 @@ class _PaymentProcessingScreenState extends State<PaymentProcessingScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      widget.paymentMethod == 'Cash'
-                          ? Icons.payments
-                          : Icons.credit_card,
+                      errorMessage == null ? Icons.payment : Icons.error,
                       size: 85,
                       color: const Color(0xFFFFC72C),
                     ),
@@ -118,19 +181,37 @@ class _PaymentProcessingScreenState extends State<PaymentProcessingScreen> {
                   ],
                 ),
               ),
-
               const SizedBox(height: 35),
-
-              const CircularProgressIndicator(
-                color: Color(0xFFD62300),
-                strokeWidth: 5,
-              ),
-
+              if (isSubmitting)
+                const CircularProgressIndicator(
+                  color: Color(0xFFD62300),
+                  strokeWidth: 5,
+                )
+              else
+                SizedBox(
+                  width: double.infinity,
+                  height: 58,
+                  child: ElevatedButton(
+                    onPressed: submitOrderAndPayment,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD62300),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text(
+                      'TRY AGAIN',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
               const SizedBox(height: 25),
-
-              const Text(
-                'Please wait...',
-                style: TextStyle(
+              Text(
+                errorMessage == null
+                    ? 'Please wait...'
+                    : 'Please check backend/API.',
+                style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFFD62300),
