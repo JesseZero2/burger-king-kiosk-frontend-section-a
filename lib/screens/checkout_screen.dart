@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/cart_service.dart';
 import '../widgets/bk_app_bar.dart';
 import 'payment_processing_screen.dart';
+import 'mock_payment_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final String orderType;
@@ -339,14 +340,19 @@ class _PaymentMethodCard extends StatelessWidget {
             height: isPhone ? 62 : 70,
             child: ElevatedButton(
               onPressed: () {
+                final screen = selectedPayment == 'Cash'
+                    ? PaymentProcessingScreen(
+                        orderType: orderType,
+                        paymentMethod: selectedPayment,
+                      )
+                    : MockPaymentScreen(
+                        orderType: orderType,
+                        paymentMethod: selectedPayment,
+                      );
+
                 Navigator.pushReplacement(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => PaymentProcessingScreen(
-                      orderType: orderType,
-                      paymentMethod: selectedPayment,
-                    ),
-                  ),
+                  MaterialPageRoute(builder: (_) => screen),
                 );
               },
               style: ElevatedButton.styleFrom(
@@ -402,9 +408,8 @@ class _SummaryText extends StatelessWidget {
             style: TextStyle(
               fontSize: isTotal ? 28 : 19,
               fontWeight: FontWeight.bold,
-              color: isTotal
-                  ? const Color(0xFFD62300)
-                  : const Color(0xFF4A1600),
+              color:
+                  isTotal ? const Color(0xFFD62300) : const Color(0xFF4A1600),
             ),
           ),
         ],

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/cart_service.dart';
 import '../widgets/bk_app_bar.dart';
 import 'payment_processing_screen.dart';
+import 'mock_payment_screen.dart';
 
 class PaymentScreen extends StatefulWidget {
   final String orderType;
@@ -41,6 +42,18 @@ class _PaymentScreenState extends State<PaymentScreen> {
     },
   ];
 
+  void openMockPayment(String methodName) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MockPaymentScreen(
+          orderType: widget.orderType,
+          paymentMethod: methodName,
+        ),
+      ),
+    );
+  }
+
   void placeOrder() {
     if (CartService.items.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -49,15 +62,19 @@ class _PaymentScreenState extends State<PaymentScreen> {
       return;
     }
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PaymentProcessingScreen(
-          orderType: widget.orderType,
-          paymentMethod: selectedPayment,
+    if (selectedPayment == 'Cash') {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PaymentProcessingScreen(
+            orderType: widget.orderType,
+            paymentMethod: selectedPayment,
+          ),
         ),
-      ),
-    );
+      );
+    } else {
+      openMockPayment(selectedPayment);
+    }
   }
 
   @override
@@ -108,14 +125,18 @@ class _PaymentScreenState extends State<PaymentScreen> {
                             ),
                             itemBuilder: (context, index) {
                               final method = paymentMethods[index];
-                              final isSelected =
-                                  selectedPayment == method['name'];
+                              final methodName = method['name'] as String;
+                              final isSelected = selectedPayment == methodName;
 
                               return InkWell(
                                 onTap: () {
                                   setState(() {
-                                    selectedPayment = method['name'];
+                                    selectedPayment = methodName;
                                   });
+
+                                  if (methodName != 'Cash') {
+                                    openMockPayment(methodName);
+                                  }
                                 },
                                 borderRadius: BorderRadius.circular(24),
                                 child: Container(
@@ -143,7 +164,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                                       ),
                                       const SizedBox(height: 14),
                                       Text(
-                                        method['name'],
+                                        methodName,
                                         style: TextStyle(
                                           fontSize: 26,
                                           fontWeight: FontWeight.bold,
@@ -301,9 +322,7 @@ class _SummaryRow extends StatelessWidget {
           style: TextStyle(
             fontSize: isTotal ? 30 : 21,
             fontWeight: FontWeight.bold,
-            color: isTotal
-                ? const Color(0xFFD62300)
-                : const Color(0xFF4A1600),
+            color: isTotal ? const Color(0xFFD62300) : const Color(0xFF4A1600),
           ),
         ),
       ],
