@@ -1,19 +1,123 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 import '../services/cart_service.dart';
 import '../widgets/bk_app_bar.dart';
 import 'welcome_screen.dart';
 
-class QueueScreen extends StatelessWidget {
+class QueueScreen extends StatefulWidget {
   final String orderType;
   final String paymentMethod;
   final String queueNumber;
+  final int? orderId;
 
   const QueueScreen({
     super.key,
     required this.orderType,
     required this.paymentMethod,
     required this.queueNumber,
+    this.orderId,
   });
+
+  @override
+  State<QueueScreen> createState() => _QueueScreenState();
+}
+
+class _QueueScreenState extends State<QueueScreen> {
+  Timer? _timer;
+  String currentStatus = 'preparing';
+  String? orderNumber;
+  String? errorMessage;
+  bool isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchOrderStatus();
+
+    if (widget.orderId != null) {
+      _timer = Timer.periodic(
+        const Duration(seconds: 5),
+        (_) => fetchOrderStatus(),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Map<String, dynamic> _extractOrderMap(Map<String, dynamic> json) {
+    final data = json['data'];
+    if (data is Map) return Map<String, dynamic>.from(data);
+
+    final order = json['order'];
+    if (order is Map) return Map<String, dynamic>.from(order);
+
+    return json;
+  }
+
+  Future<void> fetchOrderStatus() async {
+    if (widget.orderId == null) return;
+
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
+
+    try {
+      final response = await ApiService.getOrder(widget.orderId!);
+      final order = _extractOrderMap(response);
+
+      if (!mounted) return;
+
+      setState(() {
+        currentStatus = order['status']?.toString() ?? currentStatus;
+        orderNumber = order['order_number']?.toString();
+        isLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      setState(() {
+        isLoading = false;
+        errorMessage = error.toString();
+      });
+    }
+  }
+
+  String get statusTitle {
+    switch (currentStatus) {
+      case 'pending':
+        return 'Order received';
+      case 'preparing':
+        return 'Your order is being prepared';
+      case 'ready':
+        return 'Your order is ready';
+      case 'completed':
+        return 'Order completed';
+      case 'cancelled':
+        return 'Order cancelled';
+      default:
+        return 'Checking order status';
+    }
+  }
+
+  Color get statusColor {
+    switch (currentStatus) {
+      case 'ready':
+        return Colors.green;
+      case 'completed':
+        return Colors.blueGrey;
+      case 'cancelled':
+        return Colors.red;
+      default:
+        return const Color(0xFFD62300);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +162,7 @@ class QueueScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(25),
                   ),
                   child: Text(
-                    queueNumber,
+                    widget.queueNumber,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 60,
@@ -68,25 +172,59 @@ class QueueScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 25),
+                const SizedBox(height: 22),
                 Text(
-                  'Order Type: $orderType',
+                  statusTitle,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 25,
+                    fontWeight: FontWeight.bold,
+                    color: statusColor,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Status: ${currentStatus.toUpperCase()}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    color: Color(0xFF4A1600),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (orderNumber != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'Order Number: $orderNumber',
+                    style: const TextStyle(fontSize: 17),
+                  ),
+                ],
+                if (isLoading) ...[
+                  const SizedBox(height: 12),
+                  const CircularProgressIndicator(
+                    color: Color(0xFFD62300),
+                  ),
+                ],
+                if (errorMessage != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    errorMessage!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.red,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 20),
+                Text(
+                  'Order Type: ${widget.orderType}',
                   style: const TextStyle(fontSize: 20),
                 ),
                 Text(
-                  'Payment Method: $paymentMethod',
+                  'Payment Method: ${widget.paymentMethod}',
                   style: const TextStyle(fontSize: 20),
                 ),
                 const SizedBox(height: 20),
-                const Text(
-                  'Estimated waiting time: 10 - 15 minutes',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFFD62300),
-                  ),
-                ),
-                const SizedBox(height: 15),
                 const Text(
                   'Please wait for your number to be called.',
                   textAlign: TextAlign.center,

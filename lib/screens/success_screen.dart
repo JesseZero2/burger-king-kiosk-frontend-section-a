@@ -124,6 +124,7 @@ class SuccessScreen extends StatelessWidget {
                             orderType: orderType,
                             paymentMethod: paymentMethod,
                             queueNumber: displayQueueNumber,
+                            orderId: orderId,
                           ),
                         ),
                       );
