@@ -59,9 +59,13 @@ class ApiService {
   static const String _apiKey =
       'sb_publishable_vHfCgfAO2Kff2kDBqotgLg_nUUGRAlS';
 
-  static const Map<String, String> _headers = {
+  static const Map<String, String> authHeaders = {
     'apikey': _apiKey,
     'Authorization': 'Bearer $_apiKey',
+  };
+
+  static const Map<String, String> jsonHeaders = {
+    ...authHeaders,
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   };
@@ -71,7 +75,7 @@ class ApiService {
   ) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/payments'),
-      headers: _headers,
+      headers: jsonHeaders,
       body: jsonEncode(payload),
     );
 
@@ -85,7 +89,7 @@ class ApiService {
   static Future<List<Map<String, dynamic>>> getMenuItems() async {
     final response = await http.get(
       Uri.parse('$baseUrl/api/menu-items'),
-      headers: _headers,
+      headers: jsonHeaders,
     );
 
     final body = _decodeResponse(response);
@@ -110,7 +114,7 @@ class ApiService {
   static Future<Map<String, dynamic>> getMenuItem(int id) async {
     final response = await http.get(
       Uri.parse('$baseUrl/api/menu-items/$id'),
-      headers: _headers,
+      headers: jsonHeaders,
     );
 
     final body = _decodeResponse(response);
@@ -125,11 +129,27 @@ class ApiService {
     throw ApiException('Invalid menu item response format.');
   }
 
-  static Future<List<dynamic>> getOrders() async {
+  static Future<Map<String, dynamic>> getOrder(int id) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/api/orders'),
-      headers: _headers,
+      Uri.parse('$baseUrl/api/orders/$id'),
+      headers: jsonHeaders,
     );
+
+    final body = _decodeResponse(response);
+    if (body is Map<String, dynamic>) return body;
+    throw ApiException('Invalid order response format.');
+  }
+
+  static Future<List<dynamic>> getOrders({String? status, DateTime? date}) async {
+    final query = <String>[];
+    if (status != null && status.isNotEmpty && status != 'all') {
+      query.add('status=$status');
+    }
+    if (date != null) {
+      query.add('date=${date.toIso8601String().split('T').first}');
+    }
+    final uri = Uri.parse('$baseUrl/api/orders${query.isEmpty ? '' : '?${query.join('&')}'}');
+    final response = await http.get(uri, headers: jsonHeaders);
 
     final body = _decodeResponse(response);
     if (body is List) return body;
@@ -139,21 +159,44 @@ class ApiService {
     return [];
   }
 
-  static Future<Map<String, dynamic>> getOrder(int id) async {
+  static Future<Map<String, dynamic>> getDashboardSummary() async {
     final response = await http.get(
-      Uri.parse('$baseUrl/api/orders/$id'),
-      headers: _headers,
+      Uri.parse('$baseUrl/api/dashboard/summary'),
+      headers: jsonHeaders,
     );
 
     final body = _decodeResponse(response);
     if (body is Map<String, dynamic>) return body;
-    throw ApiException('Invalid order response format.');
+    throw ApiException('Invalid dashboard summary response format.');
+  }
+
+  static Future<Map<String, dynamic>> getSettings() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/settings'),
+      headers: jsonHeaders,
+    );
+
+    final body = _decodeResponse(response);
+    if (body is Map<String, dynamic>) return body;
+    throw ApiException('Invalid settings response format.');
+  }
+
+  static Future<Map<String, dynamic>> updateSettings(Map<String, dynamic> payload) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/api/settings'),
+      headers: jsonHeaders,
+      body: jsonEncode(payload),
+    );
+
+    final body = _decodeResponse(response);
+    if (body is Map<String, dynamic>) return body;
+    throw ApiException('Invalid update settings response format.');
   }
 
   static Future<CreatedOrder> createOrder(Map<String, dynamic> payload) async {
     final response = await http.post(
       Uri.parse('$baseUrl/api/orders'),
-      headers: _headers,
+      headers: jsonHeaders,
       body: jsonEncode(payload),
     );
 
@@ -168,7 +211,7 @@ class ApiService {
   ) async {
     final response = await http.put(
       Uri.parse('$baseUrl/api/orders/$id/status'),
-      headers: _headers,
+      headers: jsonHeaders,
       body: jsonEncode({'status': status}),
     );
 
