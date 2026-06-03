@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -29,10 +32,10 @@ class _AddEditMenuItemScreenState extends State<AddEditMenuItemScreen> {
   final _imageUrlController = TextEditingController();
   final _service = MenuItemService();
 
-  // ── 1. Updated category IDs to match Supabase normalized slugs ──────────────
   final List<String> _categories = const [
     'all_day_breakfast',
     'bk_cafe',
+    'burgers',
     'chicken_king',
     'chicken_rice_meals',
     'dessert',
@@ -41,16 +44,18 @@ class _AddEditMenuItemScreenState extends State<AddEditMenuItemScreen> {
     'flame_grilled_cheeseburger',
     'group_meals',
     'king_savers_bundles',
-    'king_specials',
     'plant_based_whopper',
     'ultimate_sidekings',
     'whopper',
     'xtra_long_chicken',
   ];
 
-  String _category = 'whopper';
+  String _category = 'featured';
   bool _isAvailable = true;
   bool _isSaving = false;
+
+  Uint8List? _selectedImageBytes;
+  String? _selectedImageFilename;
 
   bool get _isEditing => widget.menuItem != null;
 
@@ -78,94 +83,136 @@ class _AddEditMenuItemScreenState extends State<AddEditMenuItemScreen> {
     super.dispose();
   }
 
-  // ── 2. Updated _safeCategory to map to new normalized IDs ───────────────────
-  String _safeCategory(String value) {
-    final normalized = value.trim().toLowerCase();
-
-    // Exact match first
-    if (_categories.contains(normalized)) return normalized;
-
-    // Keyword-based fallback mapping
-    if (normalized.contains('breakfast'))        return 'all_day_breakfast';
-    if (normalized.contains('cafe') ||
-        normalized.contains('café') ||
-        normalized.contains('coffee'))           return 'bk_cafe';
-    if (normalized.contains('rice'))             return 'chicken_rice_meals';
-    if (normalized.contains('chicken'))          return 'chicken_king';
-    if (normalized.contains('dessert'))          return 'dessert';
-    if (normalized.contains('drink') ||
-        normalized.contains('beverage'))         return 'drinks';
-    if (normalized.contains('featured') ||
-        normalized.contains('special') ||
-        normalized.contains('promo'))            return 'featured';
-    if (normalized.contains('flame') ||
-        normalized.contains('grilled') ||
-        normalized.contains('cheeseburger'))     return 'flame_grilled_cheeseburger';
-    if (normalized.contains('group') ||
-        normalized.contains('bundle') ||
-        normalized.contains('family'))           return 'group_meals';
-    if (normalized.contains('saver') ||
-        normalized.contains('value'))            return 'king_savers_bundles';
-    if (normalized.contains('king_special') ||
-        normalized.contains('king special'))     return 'king_specials';
-    if (normalized.contains('plant') ||
-        normalized.contains('vegan') ||
-        normalized.contains('veggie'))           return 'plant_based_whopper';
-    if (normalized.contains('sidek') ||
-        normalized.contains('side'))             return 'ultimate_sidekings';
-    if (normalized.contains('xtra') ||
-        normalized.contains('long') ||
-        normalized.contains('extra'))            return 'xtra_long_chicken';
-    if (normalized.contains('burger') ||
-        normalized.contains('whopper'))          return 'whopper';
-    if (normalized.contains('meal'))             return 'group_meals';
-
-    // Final fallback
-    return 'whopper';
+  String _normalizeCategoryText(String value) {
+    return value.trim().toLowerCase().replaceAll(' ', '_');
   }
 
-  // ── 3. Updated _categoryLabel with human-readable display names ─────────────
+  String _safeCategory(String value) {
+    final normalized = _normalizeCategoryText(value);
+
+    if (_categories.contains(normalized)) return normalized;
+
+    if (normalized.contains('breakfast')) return 'all_day_breakfast';
+    if (normalized.contains('cafe') ||
+        normalized.contains('café') ||
+        normalized.contains('coffee')) {
+      return 'bk_cafe';
+    }
+    if (normalized.contains('rice')) return 'chicken_rice_meals';
+    if (normalized.contains('xtra') ||
+        normalized.contains('long') ||
+        normalized.contains('extra')) {
+      return 'xtra_long_chicken';
+    }
+    if (normalized.contains('chicken')) return 'chicken_king';
+    if (normalized.contains('dessert')) return 'dessert';
+    if (normalized.contains('drink') || normalized.contains('beverage')) {
+      return 'drinks';
+    }
+    if (normalized.contains('featured') ||
+        normalized.contains('special') ||
+        normalized.contains('promo')) {
+      return 'featured';
+    }
+    if (normalized.contains('flame') ||
+        normalized.contains('grilled') ||
+        normalized.contains('cheeseburger')) {
+      return 'flame_grilled_cheeseburger';
+    }
+    if (normalized.contains('group') ||
+        normalized.contains('bundle') ||
+        normalized.contains('family') ||
+        normalized.contains('meal')) {
+      return 'group_meals';
+    }
+    if (normalized.contains('saver') || normalized.contains('value')) {
+      return 'king_savers_bundles';
+    }
+    if (normalized.contains('plant') ||
+        normalized.contains('vegan') ||
+        normalized.contains('veggie')) {
+      return 'plant_based_whopper';
+    }
+    if (normalized.contains('sidek') || normalized.contains('side')) {
+      return 'ultimate_sidekings';
+    }
+    if (normalized.contains('whopper')) return 'whopper';
+    if (normalized.contains('burger')) return 'burgers';
+
+    return 'featured';
+  }
+
   String _categoryLabel(String value) {
     switch (value) {
-      case 'all_day_breakfast':         return 'All Day Breakfast';
-      case 'bk_cafe':                   return 'BK Café';
-      case 'chicken_king':              return 'Chicken King';
-      case 'chicken_rice_meals':        return 'Chicken Rice Meals';
-      case 'dessert':                   return 'Dessert';
-      case 'drinks':                    return 'Drinks';
-      case 'featured':                  return 'Featured';
-      case 'flame_grilled_cheeseburger':return 'Flame Grilled Cheeseburger';
-      case 'group_meals':               return 'Group Meals';
-      case 'king_savers_bundles':       return 'King Savers Bundles';
-      case 'king_specials':             return 'King Specials';
-      case 'plant_based_whopper':       return 'Plant Based Whopper';
-      case 'ultimate_sidekings':        return 'Ultimate Sidekings';
-      case 'whopper':                   return 'Whopper';
-      case 'xtra_long_chicken':         return 'Xtra Long Chicken';
+      case 'all_day_breakfast':
+        return 'All Day Breakfast';
+      case 'bk_cafe':
+        return 'BK Café';
+      case 'burgers':
+        return 'Burgers';
+      case 'chicken_king':
+        return 'Chicken King';
+      case 'chicken_rice_meals':
+        return 'Chicken Rice Meals';
+      case 'dessert':
+        return 'Dessert';
+      case 'drinks':
+        return 'Drinks';
+      case 'featured':
+        return 'Featured';
+      case 'flame_grilled_cheeseburger':
+        return 'Flame Grilled Cheeseburger';
+      case 'group_meals':
+        return 'Group Meals';
+      case 'king_savers_bundles':
+        return 'King Savers Bundles';
+      case 'plant_based_whopper':
+        return 'Plant Based Whopper';
+      case 'ultimate_sidekings':
+        return 'Ultimate Sidekings';
+      case 'whopper':
+        return 'Whopper';
+      case 'xtra_long_chicken':
+        return 'Xtra Long Chicken';
       default:
         return value.isEmpty ? 'Category' : value;
     }
   }
 
-  // ── 4. Updated _categoryIcon with sensible icons for new categories ──────────
   IconData _categoryIcon(String value) {
     switch (value) {
-      case 'all_day_breakfast':         return Icons.free_breakfast_rounded;
-      case 'bk_cafe':                   return Icons.local_cafe_rounded;
-      case 'chicken_king':              return Icons.set_meal_rounded;
-      case 'chicken_rice_meals':        return Icons.rice_bowl_rounded;
-      case 'dessert':                   return Icons.icecream_rounded;
-      case 'drinks':                    return Icons.local_drink_rounded;
-      case 'featured':                  return Icons.star_rounded;
-      case 'flame_grilled_cheeseburger':return Icons.outdoor_grill_rounded;
-      case 'group_meals':               return Icons.groups_rounded;
-      case 'king_savers_bundles':       return Icons.savings_rounded;
-      case 'king_specials':             return Icons.workspace_premium_rounded;
-      case 'plant_based_whopper':       return Icons.eco_rounded;
-      case 'ultimate_sidekings':        return Icons.fastfood_rounded;
-      case 'whopper':                   return Icons.lunch_dining_rounded;
-      case 'xtra_long_chicken':         return Icons.kebab_dining_rounded;
-      default:                          return Icons.restaurant_menu_rounded;
+      case 'all_day_breakfast':
+        return Icons.free_breakfast_rounded;
+      case 'bk_cafe':
+        return Icons.local_cafe_rounded;
+      case 'burgers':
+        return Icons.lunch_dining_rounded;
+      case 'chicken_king':
+        return Icons.set_meal_rounded;
+      case 'chicken_rice_meals':
+        return Icons.rice_bowl_rounded;
+      case 'dessert':
+        return Icons.icecream_rounded;
+      case 'drinks':
+        return Icons.local_drink_rounded;
+      case 'featured':
+        return Icons.star_rounded;
+      case 'flame_grilled_cheeseburger':
+        return Icons.outdoor_grill_rounded;
+      case 'group_meals':
+        return Icons.groups_rounded;
+      case 'king_savers_bundles':
+        return Icons.savings_rounded;
+      case 'plant_based_whopper':
+        return Icons.eco_rounded;
+      case 'ultimate_sidekings':
+        return Icons.fastfood_rounded;
+      case 'whopper':
+        return Icons.lunch_dining_rounded;
+      case 'xtra_long_chicken':
+        return Icons.kebab_dining_rounded;
+      default:
+        return Icons.restaurant_menu_rounded;
     }
   }
 
@@ -176,6 +223,55 @@ class _AddEditMenuItemScreenState extends State<AddEditMenuItemScreen> {
     }
 
     context.go('/admin/menu');
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      const imageTypeGroup = XTypeGroup(
+        label: 'Images',
+        extensions: ['jpg', 'jpeg', 'png', 'webp'],
+      );
+
+      final file = await openFile(
+        acceptedTypeGroups: [imageTypeGroup],
+      );
+
+      if (file == null) return;
+
+      final bytes = await file.readAsBytes();
+
+      if (bytes.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not read selected image.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+
+      setState(() {
+        _selectedImageBytes = bytes;
+        _selectedImageFilename = file.name;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Image selection failed: $error'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: _bkRed,
+        ),
+      );
+    }
+  }
+
+  void _removeSelectedImage() {
+    setState(() {
+      _selectedImageBytes = null;
+      _selectedImageFilename = null;
+    });
   }
 
   Future<void> _saveItem() async {
@@ -201,6 +297,8 @@ class _AddEditMenuItemScreenState extends State<AddEditMenuItemScreen> {
           description: description,
           isAvailable: _isAvailable,
           imageUrl: imageUrl.isEmpty ? null : imageUrl,
+          imageBytes: _selectedImageBytes,
+          imageFilename: _selectedImageFilename,
         );
       } else {
         await _service.updateMenuItem(
@@ -211,6 +309,8 @@ class _AddEditMenuItemScreenState extends State<AddEditMenuItemScreen> {
           description: description,
           isAvailable: _isAvailable,
           imageUrl: imageUrl.isEmpty ? null : imageUrl,
+          imageBytes: _selectedImageBytes,
+          imageFilename: _selectedImageFilename,
         );
       }
 
@@ -269,15 +369,9 @@ class _AddEditMenuItemScreenState extends State<AddEditMenuItemScreen> {
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      flex: 7,
-                      child: _buildFormCard(),
-                    ),
+                    Expanded(flex: 7, child: _buildFormCard()),
                     const SizedBox(width: 22),
-                    Expanded(
-                      flex: 4,
-                      child: _buildPreviewCard(),
-                    ),
+                    Expanded(flex: 4, child: _buildPreviewCard()),
                   ],
                 );
               },
@@ -397,7 +491,8 @@ class _AddEditMenuItemScreenState extends State<AddEditMenuItemScreen> {
             _buildSectionTitle(
               icon: Icons.edit_note_rounded,
               title: 'Product Information',
-              subtitle: 'Keep the name, price, and description clean for customers.',
+              subtitle:
+                  'Keep the name, price, and description clean for customers.',
             ),
             const SizedBox(height: 22),
             _buildTextField(
@@ -446,11 +541,13 @@ class _AddEditMenuItemScreenState extends State<AddEditMenuItemScreen> {
               },
             ),
             const SizedBox(height: 18),
+            _buildImagePicker(),
+            const SizedBox(height: 18),
             _buildTextField(
               controller: _imageUrlController,
               label: 'Image URL',
-              hint: 'Paste image URL from backend/storage',
-              icon: Icons.image_rounded,
+              hint: 'Optional fallback URL from backend/storage',
+              icon: Icons.link_rounded,
             ),
             const SizedBox(height: 22),
             _buildAvailabilitySwitch(),
@@ -524,6 +621,92 @@ class _AddEditMenuItemScreenState extends State<AddEditMenuItemScreen> {
     );
   }
 
+  Widget _buildImagePicker() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBF2),
+        border: Border.all(color: _bkYellow.withAlpha(140)),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 62,
+            height: 62,
+            decoration: BoxDecoration(
+              color: _bkCream,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: const Icon(Icons.image_rounded, color: _bkRed, size: 30),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Product Image',
+                  style: TextStyle(
+                    color: Color(0xFF7A6258),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  _selectedImageFilename == null
+                      ? 'Choose an image from your computer.'
+                      : _selectedImageFilename!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: _bkBrown,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'JPG, PNG, or WEBP. Max 4MB recommended.',
+                  style: TextStyle(
+                    color: Color(0xFF9B8578),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          if (_selectedImageBytes != null)
+            IconButton(
+              onPressed: _isSaving ? null : _removeSelectedImage,
+              tooltip: 'Remove selected image',
+              icon: const Icon(Icons.close_rounded, color: _bkRed),
+            ),
+          ElevatedButton.icon(
+            onPressed: _isSaving ? null : _pickImage,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _bkRed,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            icon: const Icon(Icons.upload_file_rounded),
+            label: const Text(
+              'Choose Image',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPreviewCard() {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -583,14 +766,10 @@ class _AddEditMenuItemScreenState extends State<AddEditMenuItemScreen> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    StatefulBuilder(
-                      builder: (context, setInnerState) {
-                        return _buildMiniPill(
-                          icon: _categoryIcon(_category),
-                          text: _categoryLabel(_category),
-                          color: _bkRed,
-                        );
-                      },
+                    _buildMiniPill(
+                      icon: _categoryIcon(_category),
+                      text: _categoryLabel(_category),
+                      color: _bkRed,
                     ),
                     const SizedBox(width: 8),
                     _buildMiniPill(
@@ -598,7 +777,8 @@ class _AddEditMenuItemScreenState extends State<AddEditMenuItemScreen> {
                           ? Icons.check_circle_rounded
                           : Icons.visibility_off_rounded,
                       text: _isAvailable ? 'Visible' : 'Hidden',
-                      color: _isAvailable ? const Color(0xFF00897B) : Colors.grey,
+                      color:
+                          _isAvailable ? const Color(0xFF00897B) : Colors.grey,
                     ),
                   ],
                 ),
@@ -608,9 +788,7 @@ class _AddEditMenuItemScreenState extends State<AddEditMenuItemScreen> {
                   builder: (context, value, _) {
                     final price = double.tryParse(value.text.trim()) ?? 0;
                     return Text(
-                      price <= 0
-                          ? '₱0.00'
-                          : '₱${price.toStringAsFixed(2)}',
+                      price <= 0 ? '₱0.00' : '₱${price.toStringAsFixed(2)}',
                       style: const TextStyle(
                         color: _bkRed,
                         fontSize: 28,
@@ -671,7 +849,8 @@ class _AddEditMenuItemScreenState extends State<AddEditMenuItemScreen> {
     final iconBackground = dark ? const Color(0x22FFFFFF) : _bkCream;
     final iconColor = dark ? _bkYellow : _bkRed;
     final titleColor = dark ? Colors.white : _bkBrown;
-    final subtitleColor = dark ? Colors.white.withAlpha(210) : const Color(0xFF7A6258);
+    final subtitleColor =
+        dark ? Colors.white.withAlpha(210) : const Color(0xFF7A6258);
 
     return Row(
       children: [
@@ -832,9 +1011,8 @@ class _AddEditMenuItemScreenState extends State<AddEditMenuItemScreen> {
       duration: const Duration(milliseconds: 180),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: _isAvailable
-            ? const Color(0xFFE0F2F1)
-            : const Color(0xFFF2F2F2),
+        color:
+            _isAvailable ? const Color(0xFFE0F2F1) : const Color(0xFFF2F2F2),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: _isAvailable ? const Color(0xFF80CBC4) : Colors.grey.shade300,
@@ -855,7 +1033,9 @@ class _AddEditMenuItemScreenState extends State<AddEditMenuItemScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _isAvailable ? 'Visible to Customers' : 'Hidden from Customers',
+                  _isAvailable
+                      ? 'Visible to Customers'
+                      : 'Hidden from Customers',
                   style: TextStyle(
                     color: _isAvailable ? const Color(0xFF00695C) : Colors.grey,
                     fontSize: 18,
@@ -900,28 +1080,36 @@ class _AddEditMenuItemScreenState extends State<AddEditMenuItemScreen> {
         borderRadius: BorderRadius.circular(22),
         child: Container(
           color: _bkCream,
-          child: imageUrl.isEmpty
-              ? _buildFallbackImage()
-              : Image.network(
-                  imageUrl,
+          child: _selectedImageBytes != null
+              ? Image.memory(
+                  _selectedImageBytes!,
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) {
                     return _buildFallbackImage();
                   },
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
+                )
+              : imageUrl.isEmpty
+                  ? _buildFallbackImage()
+                  : Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return _buildFallbackImage();
+                      },
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
 
-                    return Center(
-                      child: CircularProgressIndicator(
-                        color: _bkRed,
-                        value: loadingProgress.expectedTotalBytes == null
-                            ? null
-                            : loadingProgress.cumulativeBytesLoaded /
-                                loadingProgress.expectedTotalBytes!,
-                      ),
-                    );
-                  },
-                ),
+                        return Center(
+                          child: CircularProgressIndicator(
+                            color: _bkRed,
+                            value: loadingProgress.expectedTotalBytes == null
+                                ? null
+                                : loadingProgress.cumulativeBytesLoaded /
+                                    loadingProgress.expectedTotalBytes!,
+                          ),
+                        );
+                      },
+                    ),
         ),
       ),
     );

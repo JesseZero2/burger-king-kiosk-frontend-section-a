@@ -47,18 +47,56 @@ class MenuItemService {
       if (body is Map && body['message'] != null) {
         return body['message'].toString();
       }
+
+      if (body is Map && body['errors'] != null) {
+        return body['errors'].toString();
+      }
     } catch (_) {}
 
     return '$fallback. HTTP ${response.statusCode}';
   }
 
+  Map<String, String> get _multipartHeaders {
+    return {
+      ...ApiService.authHeaders,
+      'Accept': 'application/json',
+    };
+  }
+
+  Future<http.Response> _sendMultipart({
+    required String method,
+    required Uri uri,
+    required Map<String, String> fields,
+    Uint8List? imageBytes,
+    String? imageFilename,
+  }) async {
+    final request = http.MultipartRequest(method, uri);
+    request.headers.addAll(_multipartHeaders);
+    request.fields.addAll(fields);
+
+    if (imageBytes != null && imageBytes.isNotEmpty) {
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'image',
+          imageBytes,
+          filename: imageFilename != null && imageFilename.isNotEmpty
+              ? imageFilename
+              : 'menu_item.png',
+        ),
+      );
+    }
+
+    final streamedResponse = await request.send();
+    return http.Response.fromStream(streamedResponse);
+  }
+
   Future<List<MenuItemModel>> getMenuItems({String? category}) async {
-    final query = category != null && category.isNotEmpty && category != 'all'
-        ? '?category=$category'
-        : '';
+    final uri = Uri.parse('$baseUrl/menu-items').replace(
+      queryParameters: {'all': '1'},
+    );
 
     final response = await http.get(
-      Uri.parse('$baseUrl/menu-items$query'),
+      uri,
       headers: ApiService.jsonHeaders,
     );
 
@@ -69,10 +107,18 @@ class MenuItemService {
     final body = jsonDecode(response.body);
     final list = _extractList(body);
 
-    return list
+    final items = list
         .whereType<Map>()
         .map((item) => MenuItemModel.fromJson(Map<String, dynamic>.from(item)))
         .toList();
+
+    if (category != null && category.isNotEmpty && category != 'all') {
+      return items.where((item) {
+        return item.category.toLowerCase() == category.toLowerCase();
+      }).toList();
+    }
+
+    return items;
   }
 
   Future<MenuItemModel> createMenuItem({
@@ -85,21 +131,49 @@ class MenuItemService {
     Uint8List? imageBytes,
     String? imageFilename,
   }) async {
-    final payload = {
-      'name': name,
-      'category': category,
-      'price': price,
-      'description': description,
-      'is_available': isAvailable ? 1 : 0,
-      'available': isAvailable ? 1 : 0,
-      'image_url': imageUrl ?? '',
-    };
+    http.Response response;
 
-    final response = await http.post(
-      Uri.parse('$baseUrl/menu-items'),
-      headers: ApiService.jsonHeaders,
-      body: jsonEncode(payload),
-    );
+    if (imageBytes != null && imageBytes.isNotEmpty) {
+      final fields = {
+        'name': name,
+        'category': category,
+        'price': price.toString(),
+        'description': description,
+        'is_available': isAvailable ? '1' : '0',
+        'available': isAvailable ? '1' : '0',
+      };
+
+      if (imageUrl != null && imageUrl.isNotEmpty) {
+        fields['image_url'] = imageUrl;
+      }
+
+      response = await _sendMultipart(
+        method: 'POST',
+        uri: Uri.parse('$baseUrl/menu-items'),
+        fields: fields,
+        imageBytes: imageBytes,
+        imageFilename: imageFilename,
+      );
+    } else {
+      final payload = {
+        'name': name,
+        'category': category,
+        'price': price,
+        'description': description,
+        'is_available': isAvailable ? 1 : 0,
+        'available': isAvailable ? 1 : 0,
+      };
+
+      if (imageUrl != null && imageUrl.isNotEmpty) {
+        payload['image_url'] = imageUrl;
+      }
+
+      response = await http.post(
+        Uri.parse('$baseUrl/menu-items'),
+        headers: ApiService.jsonHeaders,
+        body: jsonEncode(payload),
+      );
+    }
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception(_errorMessage(response, 'Failed to create menu item'));
@@ -119,21 +193,50 @@ class MenuItemService {
     Uint8List? imageBytes,
     String? imageFilename,
   }) async {
-    final payload = {
-      'name': name,
-      'category': category,
-      'price': price,
-      'description': description,
-      'is_available': isAvailable ? 1 : 0,
-      'available': isAvailable ? 1 : 0,
-      'image_url': imageUrl ?? '',
-    };
+    http.Response response;
 
-    final response = await http.put(
-      Uri.parse('$baseUrl/menu-items/$id'),
-      headers: ApiService.jsonHeaders,
-      body: jsonEncode(payload),
-    );
+    if (imageBytes != null && imageBytes.isNotEmpty) {
+      final fields = {
+        '_method': 'PUT',
+        'name': name,
+        'category': category,
+        'price': price.toString(),
+        'description': description,
+        'is_available': isAvailable ? '1' : '0',
+        'available': isAvailable ? '1' : '0',
+      };
+
+      if (imageUrl != null && imageUrl.isNotEmpty) {
+        fields['image_url'] = imageUrl;
+      }
+
+      response = await _sendMultipart(
+        method: 'POST',
+        uri: Uri.parse('$baseUrl/menu-items/$id'),
+        fields: fields,
+        imageBytes: imageBytes,
+        imageFilename: imageFilename,
+      );
+    } else {
+      final payload = {
+        'name': name,
+        'category': category,
+        'price': price,
+        'description': description,
+        'is_available': isAvailable ? 1 : 0,
+        'available': isAvailable ? 1 : 0,
+      };
+
+      if (imageUrl != null && imageUrl.isNotEmpty) {
+        payload['image_url'] = imageUrl;
+      }
+
+      response = await http.put(
+        Uri.parse('$baseUrl/menu-items/$id'),
+        headers: ApiService.jsonHeaders,
+        body: jsonEncode(payload),
+      );
+    }
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception(_errorMessage(response, 'Failed to update menu item'));
