@@ -30,11 +30,22 @@ class _ProductScreenState extends State<ProductScreen> {
 
   Future<List<Product>> _loadProducts() async {
     final menuItems = await ApiService.getMenuItems();
-
-    return menuItems
-        .map(_productFromApi)
+    debugPrint('🔥 API returned ${menuItems.length} items');
+    if (menuItems.isNotEmpty) {
+      debugPrint('🔥 First item keys: ${menuItems.first.keys.toList()}');
+      debugPrint('🔥 First item: ${menuItems.first}');
+    }
+    final products = menuItems
+        .map((item) {
+          final product = _productFromApi(item);
+          debugPrint('✅ name=${product.name} | category=${product.category} | image=${product.image}');
+          return product;
+        })
         .where((product) => product.category == widget.category)
         .toList();
+
+    debugPrint('🔥 Products for category "${widget.category}": ${products.length}');
+    return products;
   }
 
   Product _productFromApi(Map<String, dynamic> item) {
@@ -44,14 +55,22 @@ class _ProductScreenState extends State<ProductScreen> {
     final id = int.tryParse(item['id']?.toString() ?? '') ?? name.hashCode.abs();
     final price = _parsePrice(item['price']);
 
+    // Read image_url directly — no string manipulation that could corrupt URLs
+    final rawImage = item['image_url']?.toString().trim() ?? '';
+    final image = rawImage.isNotEmpty
+        ? rawImage
+        : _fallbackImage(name, category);
+
     return Product(
       id: id,
       category: category,
       name: name,
       price: price,
-      image: _fallbackImage(name, category),
+      image: image,
     );
   }
+
+  
 
   String _normalizeCategory(String value) {
     final normalized = value.trim().toLowerCase();
@@ -118,6 +137,48 @@ class _ProductScreenState extends State<ProductScreen> {
           return word[0].toUpperCase() + word.substring(1);
         }).join(' ');
     }
+  }
+
+  Widget _buildProductImage(String imagePath) {
+    if (imagePath.startsWith('assets/')) {
+      return Image.asset(
+        imagePath,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) {
+          return const Icon(
+            Icons.fastfood,
+            size: 80,
+            color: Color(0xFFD62300),
+          );
+        },
+      );
+    }
+
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return Image.network(
+        imagePath,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) {
+          return const Icon(
+            Icons.fastfood,
+            size: 80,
+            color: Color(0xFFD62300),
+          );
+        },
+      );
+    }
+
+    return Image.asset(
+      'assets/products/placeholder.webp',
+      fit: BoxFit.contain,
+      errorBuilder: (context, error, stackTrace) {
+        return const Icon(
+          Icons.fastfood,
+          size: 80,
+          color: Color(0xFFD62300),
+        );
+      },
+    );
   }
 
   String _fallbackImage(String name, String category) {
@@ -250,17 +311,7 @@ class _ProductScreenState extends State<ProductScreen> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Expanded(
-                                child: Image.asset(
-                                  product.image,
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return const Icon(
-                                      Icons.fastfood,
-                                      size: 80,
-                                      color: Color(0xFFD62300),
-                                    );
-                                  },
-                                ),
+                                child: _buildProductImage(product.image),
                               ),
                               const SizedBox(height: 10),
                               Text(

@@ -463,25 +463,23 @@ class _DashboardContentGrid extends StatelessWidget {
           );
         }
 
-        return IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                flex: 7,
-                child: _RecentOrdersCard(
-                  orders: recentOrders,
-                  money: money,
-                  statusColor: statusColor,
-                ),
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 7,
+              child: _RecentOrdersCard(
+                orders: recentOrders,
+                money: money,
+                statusColor: statusColor,
               ),
-              const SizedBox(width: 22),
-              Expanded(
-                flex: 5,
-                child: _TopSellingCard(items: topSelling),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 22),
+            Expanded(
+              flex: 5,
+              child: _TopSellingCard(items: topSelling),
+            ),
+          ],
         );
       },
     );

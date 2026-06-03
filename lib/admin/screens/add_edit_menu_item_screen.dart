@@ -902,26 +902,34 @@ class _AddEditMenuItemScreenState extends State<AddEditMenuItemScreen> {
           color: _bkCream,
           child: imageUrl.isEmpty
               ? _buildFallbackImage()
-              : Image.network(
-                  imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return _buildFallbackImage();
-                  },
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
+              : (imageUrl.trim().startsWith('assets/')
+                  ? Image.asset(
+                      imageUrl.trim(),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return _buildFallbackImage();
+                      },
+                    )
+                  : Image.network(
+                      imageUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return _buildFallbackImage();
+                      },
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
 
-                    return Center(
-                      child: CircularProgressIndicator(
-                        color: _bkRed,
-                        value: loadingProgress.expectedTotalBytes == null
-                            ? null
-                            : loadingProgress.cumulativeBytesLoaded /
-                                loadingProgress.expectedTotalBytes!,
-                      ),
-                    );
-                  },
-                ),
+                        return Center(
+                          child: CircularProgressIndicator(
+                            color: _bkRed,
+                            value: loadingProgress.expectedTotalBytes == null
+                                ? null
+                                : loadingProgress.cumulativeBytesLoaded /
+                                    loadingProgress.expectedTotalBytes!,
+                          ),
+                        );
+                      },
+                    )),
         ),
       ),
     );
