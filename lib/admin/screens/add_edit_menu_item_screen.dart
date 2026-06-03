@@ -29,15 +29,26 @@ class _AddEditMenuItemScreenState extends State<AddEditMenuItemScreen> {
   final _imageUrlController = TextEditingController();
   final _service = MenuItemService();
 
+  // ── 1. Updated category IDs to match Supabase normalized slugs ──────────────
   final List<String> _categories = const [
-    'burgers',
-    'chicken',
-    'sides',
+    'all_day_breakfast',
+    'bk_cafe',
+    'chicken_king',
+    'chicken_rice_meals',
+    'dessert',
     'drinks',
-    'desserts',
+    'featured',
+    'flame_grilled_cheeseburger',
+    'group_meals',
+    'king_savers_bundles',
+    'king_specials',
+    'plant_based_whopper',
+    'ultimate_sidekings',
+    'whopper',
+    'xtra_long_chicken',
   ];
 
-  String _category = 'burgers';
+  String _category = 'whopper';
   bool _isAvailable = true;
   bool _isSaving = false;
 
@@ -67,53 +78,94 @@ class _AddEditMenuItemScreenState extends State<AddEditMenuItemScreen> {
     super.dispose();
   }
 
+  // ── 2. Updated _safeCategory to map to new normalized IDs ───────────────────
   String _safeCategory(String value) {
     final normalized = value.trim().toLowerCase();
 
-    if (_categories.contains(normalized)) {
-      return normalized;
-    }
+    // Exact match first
+    if (_categories.contains(normalized)) return normalized;
 
-    if (normalized.contains('burger')) return 'burgers';
-    if (normalized.contains('chicken')) return 'chicken';
-    if (normalized.contains('side')) return 'sides';
-    if (normalized.contains('drink')) return 'drinks';
-    if (normalized.contains('dessert')) return 'desserts';
+    // Keyword-based fallback mapping
+    if (normalized.contains('breakfast'))        return 'all_day_breakfast';
+    if (normalized.contains('cafe') ||
+        normalized.contains('café') ||
+        normalized.contains('coffee'))           return 'bk_cafe';
+    if (normalized.contains('rice'))             return 'chicken_rice_meals';
+    if (normalized.contains('chicken'))          return 'chicken_king';
+    if (normalized.contains('dessert'))          return 'dessert';
+    if (normalized.contains('drink') ||
+        normalized.contains('beverage'))         return 'drinks';
+    if (normalized.contains('featured') ||
+        normalized.contains('special') ||
+        normalized.contains('promo'))            return 'featured';
+    if (normalized.contains('flame') ||
+        normalized.contains('grilled') ||
+        normalized.contains('cheeseburger'))     return 'flame_grilled_cheeseburger';
+    if (normalized.contains('group') ||
+        normalized.contains('bundle') ||
+        normalized.contains('family'))           return 'group_meals';
+    if (normalized.contains('saver') ||
+        normalized.contains('value'))            return 'king_savers_bundles';
+    if (normalized.contains('king_special') ||
+        normalized.contains('king special'))     return 'king_specials';
+    if (normalized.contains('plant') ||
+        normalized.contains('vegan') ||
+        normalized.contains('veggie'))           return 'plant_based_whopper';
+    if (normalized.contains('sidek') ||
+        normalized.contains('side'))             return 'ultimate_sidekings';
+    if (normalized.contains('xtra') ||
+        normalized.contains('long') ||
+        normalized.contains('extra'))            return 'xtra_long_chicken';
+    if (normalized.contains('burger') ||
+        normalized.contains('whopper'))          return 'whopper';
+    if (normalized.contains('meal'))             return 'group_meals';
 
-    return 'burgers';
+    // Final fallback
+    return 'whopper';
   }
 
+  // ── 3. Updated _categoryLabel with human-readable display names ─────────────
   String _categoryLabel(String value) {
     switch (value) {
-      case 'burgers':
-        return 'Burgers';
-      case 'chicken':
-        return 'Chicken';
-      case 'sides':
-        return 'Sides';
-      case 'drinks':
-        return 'Drinks';
-      case 'desserts':
-        return 'Desserts';
+      case 'all_day_breakfast':         return 'All Day Breakfast';
+      case 'bk_cafe':                   return 'BK Café';
+      case 'chicken_king':              return 'Chicken King';
+      case 'chicken_rice_meals':        return 'Chicken Rice Meals';
+      case 'dessert':                   return 'Dessert';
+      case 'drinks':                    return 'Drinks';
+      case 'featured':                  return 'Featured';
+      case 'flame_grilled_cheeseburger':return 'Flame Grilled Cheeseburger';
+      case 'group_meals':               return 'Group Meals';
+      case 'king_savers_bundles':       return 'King Savers Bundles';
+      case 'king_specials':             return 'King Specials';
+      case 'plant_based_whopper':       return 'Plant Based Whopper';
+      case 'ultimate_sidekings':        return 'Ultimate Sidekings';
+      case 'whopper':                   return 'Whopper';
+      case 'xtra_long_chicken':         return 'Xtra Long Chicken';
       default:
         return value.isEmpty ? 'Category' : value;
     }
   }
 
+  // ── 4. Updated _categoryIcon with sensible icons for new categories ──────────
   IconData _categoryIcon(String value) {
     switch (value) {
-      case 'burgers':
-        return Icons.lunch_dining_rounded;
-      case 'chicken':
-        return Icons.set_meal_rounded;
-      case 'sides':
-        return Icons.fastfood_rounded;
-      case 'drinks':
-        return Icons.local_drink_rounded;
-      case 'desserts':
-        return Icons.icecream_rounded;
-      default:
-        return Icons.restaurant_menu_rounded;
+      case 'all_day_breakfast':         return Icons.free_breakfast_rounded;
+      case 'bk_cafe':                   return Icons.local_cafe_rounded;
+      case 'chicken_king':              return Icons.set_meal_rounded;
+      case 'chicken_rice_meals':        return Icons.rice_bowl_rounded;
+      case 'dessert':                   return Icons.icecream_rounded;
+      case 'drinks':                    return Icons.local_drink_rounded;
+      case 'featured':                  return Icons.star_rounded;
+      case 'flame_grilled_cheeseburger':return Icons.outdoor_grill_rounded;
+      case 'group_meals':               return Icons.groups_rounded;
+      case 'king_savers_bundles':       return Icons.savings_rounded;
+      case 'king_specials':             return Icons.workspace_premium_rounded;
+      case 'plant_based_whopper':       return Icons.eco_rounded;
+      case 'ultimate_sidekings':        return Icons.fastfood_rounded;
+      case 'whopper':                   return Icons.lunch_dining_rounded;
+      case 'xtra_long_chicken':         return Icons.kebab_dining_rounded;
+      default:                          return Icons.restaurant_menu_rounded;
     }
   }
 

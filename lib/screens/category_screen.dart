@@ -6,6 +6,95 @@ import '../widgets/bk_app_bar.dart';
 import 'cart_screen.dart';
 import 'product_detail_screen.dart';
 
+String categoryLabel(String category) {
+  switch (category) {
+    case 'all_day_breakfast':
+      return 'All Day Breakfast';
+    case 'bk_cafe':
+      return 'BK Café';
+    case 'chicken_king':
+      return 'Chicken King';
+    case 'chicken_rice_meals':
+      return 'Chicken Rice Meals';
+    case 'dessert':
+      return 'Dessert';
+    case 'drinks':
+      return 'Drinks';
+    case 'featured':
+      return 'Featured';
+    case 'flame_grilled_cheeseburger':
+      return 'Flame Grilled Cheeseburger';
+    case 'group_meals':
+      return 'Group Meals';
+    case 'king_savers_bundles':
+      return 'King Savers Bundles';
+    case 'king_specials':
+      return 'King Specials';
+    case 'plant_based_whopper':
+      return 'Plant Based Whopper';
+    case 'ultimate_sidekings':
+      return 'Ultimate Sidekings';
+    case 'whopper':
+      return 'Whopper';
+    case 'xtra_long_chicken':
+      return 'Xtra Long Chicken';
+    default:
+      return category
+          .replaceAll('_', ' ')
+          .split(' ')
+          .map((word) {
+            if (word.isEmpty) return word;
+            return word[0].toUpperCase() + word.substring(1);
+          })
+          .join(' ');
+  }
+}
+
+const List<String> _backendCategoryOrder = [
+  'all_day_breakfast',
+  'bk_cafe',
+  'chicken_king',
+  'chicken_rice_meals',
+  'dessert',
+  'drinks',
+  'featured',
+  'flame_grilled_cheeseburger',
+  'group_meals',
+  'king_savers_bundles',
+  'king_specials',
+  'plant_based_whopper',
+  'ultimate_sidekings',
+  'whopper',
+  'xtra_long_chicken',
+];
+
+String _normalizeCategory(String value) {
+  final normalized = value.trim().toLowerCase();
+
+  // Exact match first
+  if (_backendCategoryOrder.contains(normalized)) return normalized;
+
+  // Keyword-based fallback mapping (mirror admin logic)
+  if (normalized.contains('breakfast')) return 'all_day_breakfast';
+  if (normalized.contains('cafe') || normalized.contains('café') || normalized.contains('coffee')) return 'bk_cafe';
+  if (normalized.contains('rice')) return 'chicken_rice_meals';
+  if (normalized.contains('chicken')) return 'chicken_king';
+  if (normalized.contains('dessert')) return 'dessert';
+  if (normalized.contains('drink') || normalized.contains('beverage')) return 'drinks';
+  if (normalized.contains('featured') || normalized.contains('special') || normalized.contains('promo')) return 'featured';
+  if (normalized.contains('flame') || normalized.contains('grilled') || normalized.contains('cheeseburger')) return 'flame_grilled_cheeseburger';
+  if (normalized.contains('group') || normalized.contains('bundle') || normalized.contains('family')) return 'group_meals';
+  if (normalized.contains('saver') || normalized.contains('value')) return 'king_savers_bundles';
+  if (normalized.contains('king_special') || normalized.contains('king special')) return 'king_specials';
+  if (normalized.contains('plant') || normalized.contains('vegan') || normalized.contains('veggie')) return 'plant_based_whopper';
+  if (normalized.contains('sidek') || normalized.contains('side')) return 'ultimate_sidekings';
+  if (normalized.contains('xtra') || normalized.contains('long') || normalized.contains('extra')) return 'xtra_long_chicken';
+  if (normalized.contains('burger') || normalized.contains('whopper')) return 'whopper';
+  if (normalized.contains('meal')) return 'group_meals';
+
+  return normalized;
+}
+
 class CategoryScreen extends StatefulWidget {
   final String orderType;
 
@@ -24,16 +113,15 @@ class _CategoryScreenState extends State<CategoryScreen> {
   String? errorMessage;
   List<Product> products = [];
 
+  // backend category order is defined at top-level
+
   List<String> get categories {
-    final allCategories = products.map((product) => product.category).toSet().toList();
+    // Use backend category order (asset folders) as the primary list so
+    // the kiosk shows all configured categories regardless of loaded items.
+    final categorySet = products.map((product) => product.category).toSet();
+    final extraCategories = categorySet.difference(_backendCategoryOrder.toSet()).toList()..sort();
 
-    allCategories.sort((a, b) {
-      if (a == 'Featured') return -1;
-      if (b == 'Featured') return 1;
-      return a.compareTo(b);
-    });
-
-    return allCategories;
+    return [..._backendCategoryOrder, ...extraCategories];
   }
 
   List<Product> get selectedProducts {
@@ -57,23 +145,13 @@ class _CategoryScreenState extends State<CategoryScreen> {
     try {
       final menuItems = await ApiService.getMenuItems();
       final loadedProducts = menuItems.map(_productFromApi).toList();
-      final loadedCategories = loadedProducts.map((product) => product.category).toSet().toList();
-
-      loadedCategories.sort((a, b) {
-        if (a == 'Featured') return -1;
-        if (b == 'Featured') return 1;
-        return a.compareTo(b);
-      });
+      final loadedCategorySet = loadedProducts.map((product) => product.category).toSet();
 
       if (!mounted) return;
 
       setState(() {
         products = loadedProducts;
-        selectedCategory = loadedCategories.contains('Featured')
-            ? 'Featured'
-            : loadedCategories.isNotEmpty
-                ? loadedCategories.first
-                : '';
+        selectedCategory = _selectInitialCategory(loadedCategorySet);
         isLoading = false;
       });
     } catch (error) {
@@ -88,7 +166,8 @@ class _CategoryScreenState extends State<CategoryScreen> {
 
   Product _productFromApi(Map<String, dynamic> item) {
     final name = item['name']?.toString() ?? 'Menu Item';
-    final category = item['category']?.toString() ?? 'Menu';
+    final rawCategory = item['category']?.toString() ?? 'Menu';
+    final category = _normalizeCategory(rawCategory);
     final id = int.tryParse(item['id']?.toString() ?? '') ?? name.hashCode.abs();
     final price = _parsePrice(item['price']);
 
@@ -104,6 +183,22 @@ class _CategoryScreenState extends State<CategoryScreen> {
   double _parsePrice(dynamic value) {
     if (value is num) return value.toDouble();
     return double.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  String _selectInitialCategory(Set<String> loadedCategorySet) {
+    if (loadedCategorySet.contains('featured')) return 'featured';
+
+    for (final category in _backendCategoryOrder) {
+      if (loadedCategorySet.contains(category)) {
+        return category;
+      }
+    }
+
+    // Fall back to the first backend category (asset folder) so the UI
+    // always has a sensible selected category even if no products loaded.
+    if (_backendCategoryOrder.isNotEmpty) return _backendCategoryOrder.first;
+
+    return loadedCategorySet.isNotEmpty ? loadedCategorySet.first : '';
   }
 
   String _fallbackImage(String name, String category) {
@@ -330,6 +425,8 @@ class _CategoryScreenState extends State<CategoryScreen> {
   }
 
   Widget _buildProductArea() {
+    final selectedProductsList = selectedProducts;
+
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.all(12),
@@ -338,39 +435,75 @@ class _CategoryScreenState extends State<CategoryScreen> {
           _buildSelectedCategoryHeader(),
           const SizedBox(height: 12),
           Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final bool compact = constraints.maxWidth < 650;
+            child: selectedProductsList.isEmpty
+                ? _buildEmptyCategoryView()
+                : LayoutBuilder(
+                    builder: (context, constraints) {
+                      final bool compact = constraints.maxWidth < 650;
 
-                return GridView.builder(
-                  itemCount: selectedProducts.length,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: compact ? 0.95 : 1.08,
+                      return GridView.builder(
+                        itemCount: selectedProductsList.length,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          childAspectRatio: compact ? 0.95 : 1.08,
+                        ),
+                        itemBuilder: (context, index) {
+                          final product = selectedProductsList[index];
+
+                          return _ProductCard(
+                            product: product,
+                            onTap: () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ProductDetailScreen(
+                                    product: product,
+                                    orderType: widget.orderType,
+                                  ),
+                                ),
+                              );
+                              setState(() {});
+                            },
+                          );
+                        },
+                      );
+                    },
                   ),
-                  itemBuilder: (context, index) {
-                    final product = selectedProducts[index];
+          ),
+        ],
+      ),
+    );
+  }
 
-                    return _ProductCard(
-                      product: product,
-                      onTap: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ProductDetailScreen(
-                              product: product,
-                              orderType: widget.orderType,
-                            ),
-                          ),
-                        );
-                        setState(() {});
-                      },
-                    );
-                  },
-                );
-              },
+  Widget _buildEmptyCategoryView() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.search_off,
+            size: 72,
+            color: Color(0xFFD62300),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'No items available for "${categoryLabel(selectedCategory)}".',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 16,
+              color: Color(0xFF4A1600),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Please select another category or check back later.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xFF4A1600),
             ),
           ),
         ],
@@ -413,7 +546,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  selectedCategory,
+                  categoryLabel(selectedCategory),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -593,7 +726,7 @@ class _CategoryTile extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                category,
+                categoryLabel(category),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(

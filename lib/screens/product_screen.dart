@@ -39,7 +39,8 @@ class _ProductScreenState extends State<ProductScreen> {
 
   Product _productFromApi(Map<String, dynamic> item) {
     final name = item['name']?.toString() ?? 'Menu Item';
-    final category = item['category']?.toString() ?? 'Menu';
+    final rawCategory = item['category']?.toString() ?? 'Menu';
+    final category = _normalizeCategory(rawCategory);
     final id = int.tryParse(item['id']?.toString() ?? '') ?? name.hashCode.abs();
     final price = _parsePrice(item['price']);
 
@@ -52,9 +53,71 @@ class _ProductScreenState extends State<ProductScreen> {
     );
   }
 
+  String _normalizeCategory(String value) {
+    final normalized = value.trim().toLowerCase();
+
+    if (normalized.contains('breakfast')) return 'all_day_breakfast';
+    if (normalized.contains('cafe') || normalized.contains('café') || normalized.contains('coffee')) return 'bk_cafe';
+    if (normalized.contains('rice')) return 'chicken_rice_meals';
+    if (normalized.contains('chicken')) return 'chicken_king';
+    if (normalized.contains('dessert') || normalized.contains('sundae')) return 'dessert';
+    if (normalized.contains('drink') || normalized.contains('beverage') || normalized.contains('float')) return 'drinks';
+    if (normalized.contains('featured') || normalized.contains('popular')) return 'featured';
+    if (normalized.contains('flame') || normalized.contains('cheese') || normalized.contains('cheeseburger')) return 'flame_grilled_cheeseburger';
+    if (normalized.contains('group')) return 'group_meals';
+    if (normalized.contains('saver') || normalized.contains('bundle')) return 'king_savers_bundles';
+    if (normalized.contains('king') && normalized.contains('special')) return 'king_specials';
+    if (normalized.contains('plant') || normalized.contains('vegan')) return 'plant_based_whopper';
+    if (normalized.contains('side')) return 'ultimate_sidekings';
+    if (normalized.contains('x-tra') || normalized.contains('xtra') || normalized.contains('long')) return 'xtra_long_chicken';
+    if (normalized.contains('whopper') || normalized.contains('burger')) return 'whopper';
+
+    return normalized.replaceAll(' ', '_');
+  }
+
   double _parsePrice(dynamic value) {
     if (value is num) return value.toDouble();
     return double.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  String _categoryLabel(String category) {
+    switch (category) {
+      case 'all_day_breakfast':
+        return 'All Day Breakfast';
+      case 'bk_cafe':
+        return 'BK Café';
+      case 'chicken_king':
+        return 'Chicken King';
+      case 'chicken_rice_meals':
+        return 'Chicken Rice Meals';
+      case 'dessert':
+        return 'Dessert';
+      case 'drinks':
+        return 'Drinks';
+      case 'featured':
+        return 'Featured';
+      case 'flame_grilled_cheeseburger':
+        return 'Flame Grilled Cheeseburger';
+      case 'group_meals':
+        return 'Group Meals';
+      case 'king_savers_bundles':
+        return 'King Savers Bundles';
+      case 'king_specials':
+        return 'King Specials';
+      case 'plant_based_whopper':
+        return 'Plant Based Whopper';
+      case 'ultimate_sidekings':
+        return 'Ultimate Sidekings';
+      case 'whopper':
+        return 'Whopper';
+      case 'xtra_long_chicken':
+        return 'Xtra Long Chicken';
+      default:
+        return category.replaceAll('_', ' ').split(' ').map((word) {
+          if (word.isEmpty) return word;
+          return word[0].toUpperCase() + word.substring(1);
+        }).join(' ');
+    }
   }
 
   String _fallbackImage(String name, String category) {
@@ -102,7 +165,7 @@ class _ProductScreenState extends State<ProductScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFFD62300),
         foregroundColor: Colors.white,
-        title: Text(widget.category),
+        title: Text(_categoryLabel(widget.category)),
         actions: [
           IconButton(
             icon: Stack(
@@ -150,7 +213,7 @@ class _ProductScreenState extends State<ProductScreen> {
 
           if (products.isEmpty) {
             return _ErrorState(
-              message: 'No menu items found for ${widget.category}.',
+              message: 'No menu items found for ${_categoryLabel(widget.category)}.',
               onRetry: _reloadProducts,
             );
           }
